@@ -1,27 +1,16 @@
-from fastapi import FastAPI, APIRouter, Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordRequestForm
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from datetime import datetime
 from typing import List
-
+from fastapi.security import OAuth2PasswordRequestForm
 from database import get_db
 from models import User, AutoPlate, Bid
-from schemas import UserCreate, UserResponse, AutoPlateCreate, AutoPlateResponse, BidCreate, BidResponse
+from schemas import *
 from auth import get_current_user, create_access_token, get_password_hash
-
-app = FastAPI()
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["http://127.0.0.1:5500"],  # Frontend domenini moslang
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 router = APIRouter()
 
-# Foydalanuvchi autentifikatsiyasi
+# ✅ Foydalanuvchini ro'yxatdan o'tkazish
 @router.post("/register/", response_model=UserResponse)
 def register(user_data: UserCreate, db: Session = Depends(get_db)):
     existing_user = db.query(User).filter(User.username == user_data.username).first()
@@ -35,11 +24,12 @@ def register(user_data: UserCreate, db: Session = Depends(get_db)):
     token = create_access_token(new_user.id)
     return {"id": new_user.id, "username": new_user.username, "token": token}
 
+# ✅ Login qilish
 @router.post("/login/")
 def login(form_data: OAuth2PasswordRequestForm = Depends()):
     return {"username": form_data.username, "password": form_data.password}
 
-# Avtomobil raqamlarini boshqarish
+# ✅ Avtomobil raqamlarini ko'rish
 @router.get("/plates/", response_model=List[AutoPlateResponse])
 def list_plates(ordering: str = None, plate_number__contains: str = None, db: Session = Depends(get_db)):
     query = db.query(AutoPlate).filter(AutoPlate.is_active == True)
@@ -49,6 +39,7 @@ def list_plates(ordering: str = None, plate_number__contains: str = None, db: Se
         query = query.order_by(AutoPlate.deadline)
     return query.all()
 
+# ✅ Avtomobil raqamini qo'shish
 @router.post("/plates/", response_model=AutoPlateResponse)
 def create_plate(plate: AutoPlateCreate, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     if not current_user.is_admin:
@@ -63,6 +54,7 @@ def create_plate(plate: AutoPlateCreate, current_user: User = Depends(get_curren
     db.refresh(new_plate)
     return new_plate
 
+# ✅ Bitta raqamni ko'rish
 @router.get("/plates/{id}/", response_model=AutoPlateResponse)
 def get_plate(id: int, db: Session = Depends(get_db)):
     plate = db.query(AutoPlate).filter(AutoPlate.id == id).first()
@@ -70,6 +62,7 @@ def get_plate(id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Raqam topilmadi")
     return plate
 
+# ✅ Raqamni yangilash
 @router.put("/plates/{id}/", response_model=AutoPlateResponse)
 def update_plate(id: int, plate_data: AutoPlateCreate, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     plate = db.query(AutoPlate).filter(AutoPlate.id == id).first()
@@ -80,6 +73,7 @@ def update_plate(id: int, plate_data: AutoPlateCreate, current_user: User = Depe
     db.commit()
     return plate
 
+# ✅ Raqamni o'chirish
 @router.delete("/plates/{id}/")
 def delete_plate(id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     plate = db.query(AutoPlate).filter(AutoPlate.id == id).first()
@@ -91,11 +85,12 @@ def delete_plate(id: int, current_user: User = Depends(get_current_user), db: Se
     db.commit()
     return {"message": "Raqam o'chirildi"}
 
-# Takliflarni boshqarish
+# ✅ Foydalanuvchining takliflari
 @router.get("/bids/", response_model=List[BidResponse])
 def list_bids(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     return db.query(Bid).filter(Bid.user_id == current_user.id).all()
 
+# ✅ Taklif berish
 @router.post("/bids/", response_model=BidResponse)
 def place_bid(bid: BidCreate, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     plate = db.query(AutoPlate).filter(AutoPlate.id == bid.plate_id).first()
@@ -112,9 +107,7 @@ def place_bid(bid: BidCreate, current_user: User = Depends(get_current_user), db
     db.refresh(new_bid)
     return new_bid
 
-
-
-
+# ✅ Bitta taklifni ko'rish
 @router.get("/bids/{id}/")
 def get_bid(id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     bid = db.query(Bid).filter(Bid.id == id, Bid.user_id == current_user.id).first()
@@ -122,6 +115,7 @@ def get_bid(id: int, current_user: User = Depends(get_current_user), db: Session
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Ruxsat yo'q")
     return bid
 
+# ✅ Taklifni yangilash
 @router.put("/bids/{id}/")
 def update_bid(id: int, bid_data: BidCreate, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     bid = db.query(Bid).filter(Bid.id == id, Bid.user_id == current_user.id).first()
@@ -134,17 +128,12 @@ def update_bid(id: int, bid_data: BidCreate, current_user: User = Depends(get_cu
     db.commit()
     return bid
 
+# ✅ Taklifni o'chirish
 @router.delete("/bids/{id}/")
 def delete_bid(id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     bid = db.query(Bid).filter(Bid.id == id, Bid.user_id == current_user.id).first()
     if not bid:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Ruxsat yo'q")
-    plate = db.query(AutoPlate).filter(AutoPlate.id == bid.plate_id).first()
-    if plate.deadline < datetime.utcnow():
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Taklif muddati tugagan")
     db.delete(bid)
     db.commit()
     return {"message": "Taklif o'chirildi"}
-
-
-app.include_router(router)
