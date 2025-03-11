@@ -1,5 +1,17 @@
 from pydantic import BaseModel
 from datetime import datetime
+
+
+class AutoPlateResponse(BaseModel):
+    id: int
+    plate_number: str
+    starting_price: float
+    deadline: datetime
+    is_active: bool
+
+    class Config:
+        orm_mode = True
+
 class UserCreate(BaseModel):
     username: str
     email: str
@@ -14,11 +26,18 @@ class AutoPlateCreate(BaseModel):
     description: str
     deadline: datetime
 
+class BidResponse(BaseModel):
+    id: int
+    user_id: int
+    plate_id: int
+    amount: float
+    timestamp: datetime
+
+    class Config:
+        orm_mode = True
 class BidCreate(BaseModel):
     amount: float
     plate_id: int
-
-from pydantic import BaseModel
 
 
 class UserCreate(BaseModel):
